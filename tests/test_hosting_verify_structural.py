@@ -195,6 +195,27 @@ class RealFontShortReplyTests(unittest.TestCase):
                 self.assertTrue(delivered)
                 self.assertLess(trace["peak_input"], 0.01)
 
+    def test_wechats_grey_placeholder_in_the_empty_box_is_not_a_leftover_draft(self):
+        # Live 21:5x: after a real send the empty box showed the grey hint
+        # "按住鼠标 语音输入文字" (brightest pixel 123,123,128 on 30,30,31); it was
+        # measured as a 197 px leftover draft and a sent message froze as UNKNOWN.
+        from input_readback_fixtures import font
+        empty = input_fixture(text="")
+        ImageDraw.Draw(empty).text((22, 20), "按住鼠标 语音输入文字", font=font(), fill=(123, 123, 128), anchor="lt")
+        self.assertEqual(draft_width(pixel(self.frame_with(empty)).crop(INPUT)), 0)
+        delivered, trace = run(self.frame_with(input_fixture(text="周末一起去爬山吧，天气不错")),
+                               [self.frame_with(empty, bubble=True)])
+        self.assertTrue(delivered)
+        self.assertEqual(trace["draft_left_min"], 0)
+
+    def test_real_text_left_in_the_box_is_still_caught_next_to_the_hint(self):
+        from input_readback_fixtures import font
+        left = input_fixture(text="周末一起去爬山")       # half the draft still there
+        ImageDraw.Draw(left).text((600, 20), "按住鼠标 语音输入文字", font=font(), fill=(123, 123, 128), anchor="lt")
+        delivered, _ = run(self.frame_with(input_fixture(text="周末一起去爬山吧，天气不错")),
+                           [self.frame_with(left, bubble=True)])
+        self.assertFalse(delivered)
+
     def test_caret_shaped_glyph_cannot_be_told_from_the_caret(self):
         # Rare, and it fails toward UNKNOWN (freeze), never toward "sent".
         delivered, trace = run(self.frame_with(input_fixture(text="丨")),

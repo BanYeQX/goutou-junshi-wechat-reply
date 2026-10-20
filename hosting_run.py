@@ -298,7 +298,12 @@ def _ratio(old_bytes, new_bytes):
 
 # A pixel is "ink" when some channel differs from the box background by more
 # than this. Faint anti-aliasing below it is ignored on both sides of Enter.
-INK_TOLERANCE = 48
+# Was 48. Live 2026-10-20 21:5x: an EMPTY box showed WeChat's grey placeholder
+# hint, max 97 from the background (brightest pixel grey 123), measured as a
+# 197 px "leftover draft" -> a sent message was frozen as UNKNOWN. Typed text
+# is near white (~190 from the dark background, ~235 from the light one), so
+# 140 keeps every real character, the caret and a lone glyph, and drops the hint.
+INK_TOLERANCE = 140
 # Ink columns closer than this belong to one run: strokes of one glyph ("川",
 # strokes ~6px apart) and neighbouring glyphs merge, so a character is never
 # mistaken for a caret.
