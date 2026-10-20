@@ -1,0 +1,12 @@
+# Local state: keys, contacts, portraits, calibration, send ledger, chat context
+data/
+.venv/
+__pycache__/
+*.pyc
+*.log
+build/
+dist/
+tests/tmp*/
+tmp*/
+.calibration-preview-*.json
+artifacts/

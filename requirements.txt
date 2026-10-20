@@ -1,0 +1,13 @@
+wxauto4==41.1.7
+pywin32>=311
+PyJWT[crypto]>=2.10,<3
+Pillow>=12.3,<13
+winrt-runtime==3.2.1
+winrt-Windows.Foundation==3.2.1
+winrt-Windows.Foundation.Collections==3.2.1
+winrt-Windows.Globalization==3.2.1
+winrt-Windows.Graphics.Imaging==3.2.1
+winrt-Windows.Media.Ocr==3.2.1
+winrt-Windows.Storage.Streams==3.2.1
+rapidocr==3.10.0
+onnxruntime==1.31.0
