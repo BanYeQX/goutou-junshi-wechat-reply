@@ -108,12 +108,52 @@ class Session:
             return 1.0               # a resize is a change, never a message
         left, top, right, bottom = self.geometry.messages_frame
         box = (max(0, left), max(0, top), min(frame.width, right), min(frame.height, bottom))
+        fast = region_change(previous, frame, box)
+        if fast is not None:
+            return fast
         old = previous.crop(box).tobytes()
         new = frame.crop(box).tobytes()
         if len(old) != len(new) or not old:
             return 1.0
-        differing = sum(1 for a, b in zip(old, new) if a != b)
-        return differing / len(old)
+        return differing_bytes(old, new) / len(old)
+
+
+def region_change(previous, frame, box):
+    """Share of differing bytes inside box, compared in place - no crop copies.
+
+    PixelImage.crop rebuilds the region row by row; doing that for two frames
+    on every loop step was most of the step's cost. Same number as comparing
+    the two crops. None when numpy is missing or the buffers are not plain
+    width x height x channels, so the caller falls back to cropping.
+    """
+    try:
+        import numpy as np
+    except ImportError:
+        return None
+    width, height = frame.size
+    a, b = previous.tobytes(), frame.tobytes()
+    if len(a) != len(b) or not width or not height or len(a) % (width * height):
+        return None
+    channels = len(a) // (width * height)
+    left, top, right, bottom = box
+    if right <= left or bottom <= top:
+        return 1.0
+    old = np.frombuffer(a, np.uint8).reshape(height, width, channels)[top:bottom, left:right]
+    new = np.frombuffer(b, np.uint8).reshape(height, width, channels)[top:bottom, left:right]
+    return int(np.count_nonzero(old != new)) / old.size
+
+
+def differing_bytes(old: bytes, new: bytes) -> int:
+    """How many bytes differ between two equal-length buffers.
+
+    numpy when available: the pure-Python loop took ~0.24 s per frame on the
+    maximized message area (10 MB), on every loop step. Same count either way.
+    """
+    try:
+        import numpy as np
+    except ImportError:            # still correct, just slower
+        return sum(1 for a, b in zip(old, new) if a != b)
+    return int(np.count_nonzero(np.frombuffer(old, np.uint8) != np.frombuffer(new, np.uint8)))
 
 
 # The newest bubble's bottom padding must stay within this many pixels of the

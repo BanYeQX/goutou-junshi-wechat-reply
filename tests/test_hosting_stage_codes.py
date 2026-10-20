@@ -72,10 +72,18 @@ class StageReasonCodeTests(unittest.TestCase):
             return paused[0]
 
     def test_pause_text_carries_each_attempt_reason_and_nothing_is_committed(self):
+        text = self.run_with("READBACK_MISMATCH", "exact_text_mismatch",
+                             ["1:READBACK_MISMATCH/exact_text_mismatch", "2:PROBE_FAILED/copy_did_not_run"])
+        self.assertIn("未通过暂存", text)
+        self.assertIn("1:READBACK_MISMATCH/exact_text_mismatch，2:PROBE_FAILED/copy_did_not_run", text)
+
+    def test_copy_that_never_runs_says_click_the_input_box(self):
+        # Live 21:4x: keyboard focus was not in WeChat's input box.
         text = self.run_with("PROBE_FAILED", "copy_did_not_run",
                              ["1:PROBE_FAILED/copy_did_not_run", "2:PROBE_FAILED/copy_did_not_run"])
-        self.assertIn("未通过暂存", text)
-        self.assertIn("1:PROBE_FAILED/copy_did_not_run，2:PROBE_FAILED/copy_did_not_run", text)
+        self.assertIn("没有键盘焦点", text)
+        self.assertIn("输入框里点一下", text)
+        self.assertIn("未粘贴、未提交", text)
 
     def test_draft_in_box_says_draft_protection_not_clipboard_failure(self):
         text = self.run_with("DRAFT_PRESENT", "non_text_draft_in_input",

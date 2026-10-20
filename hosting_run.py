@@ -31,6 +31,7 @@ CALIBRATION = __import__("os").path.join(REPO, "data", "visual_calibration.json"
 # maximized layout; it is NOT a fraction of the window width - the chat list is
 # only ~16% wide when maximized, so a ratio crop lands on empty space.
 TITLE_FRAME = (434, 55, 760, 135)
+LOOP_INTERVAL_S = 0.25
 # How far left of TITLE_FRAME the list/chat divider may have moved. Live
 # 2026-10-20 20:2x: the divider sat at x=401, the fixed crop from 434 cut the
 # left half of "千" off and OCR read "F星" - hosting refused to start.
@@ -291,8 +292,8 @@ def _same_reply(seen, sent):
 def _ratio(old_bytes, new_bytes):
     if not old_bytes or len(old_bytes) != len(new_bytes):
         return 1.0
-    differing = sum(1 for a, b in zip(old_bytes, new_bytes) if a != b)
-    return differing / len(old_bytes)
+    from hosting_session import differing_bytes
+    return differing_bytes(old_bytes, new_bytes) / len(old_bytes)
 
 
 # A pixel is "ink" when some channel differs from the box background by more
@@ -815,6 +816,11 @@ def run_hosting(calibration, ledger, *, live=False, stage_only=False,
                                     "未粘贴、未提交。请先处理输入框再重新开始")
                         else:
                             text = "暂停：未通过暂存/草稿保护/逐字回读；未提交"
+                            if stage_notes and all("copy_did_not_run" in n for n in stage_notes):
+                                # Live 21:4x: Ctrl+C copied nothing - keyboard
+                                # focus was not in WeChat's input box.
+                                text = ("暂停：微信输入框没有键盘焦点（复制没有生效）。请在微信输入框里点一下，"
+                                        "托管期间别点微信的其他区域，再重新开始；未粘贴、未提交")
                         event("system", text=f"{text} [{codes}]", state="已暂停")
                         break
                     if stop_event.is_set():
@@ -869,7 +875,9 @@ def run_hosting(calibration, ledger, *, live=False, stage_only=False,
                       state="待人工确认" if detail == "unknown_after_commit" else "已暂停")
                 log(f"    paused: {detail}", flush=True)
                 break
-            stop_event.wait(0.5)
+            # 0.25 s, was 0.5 s: a step costs ~0.1 s now that the frame
+            # comparison is vectorised, so new messages are noticed sooner.
+            stop_event.wait(LOOP_INTERVAL_S)
     except KeyboardInterrupt:
         log("interrupted", flush=True)
     finally:
