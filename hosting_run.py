@@ -31,6 +31,49 @@ CALIBRATION = __import__("os").path.join(REPO, "data", "visual_calibration.json"
 # maximized layout; it is NOT a fraction of the window width - the chat list is
 # only ~16% wide when maximized, so a ratio crop lands on empty space.
 TITLE_FRAME = (434, 55, 760, 135)
+# How far left of TITLE_FRAME the list/chat divider may have moved. Live
+# 2026-10-20 20:2x: the divider sat at x=401, the fixed crop from 434 cut the
+# left half of "千" off and OCR read "F星" - hosting refused to start.
+TITLE_DIVIDER_SEARCH = 200
+
+
+def title_box(frame):
+    """TITLE_FRAME, but starting where the chat pane really begins.
+
+    WeChat's contact list can be dragged narrower or wider; the title follows
+    the chat pane. Scan the middle row of the title band for the edge from the
+    list background to the chat title bar and start just right of it - never
+    left, so the list (and its search box) can not supply the contact's name.
+    Not found (other theme, synthetic frame): the fixed TITLE_FRAME.
+    """
+    left, top, right, bottom = TITLE_FRAME
+    width, height = frame.size
+    y = (top + bottom) // 2
+    if not (0 <= y < height and right <= width):
+        return TITLE_FRAME
+    data = frame.tobytes()
+
+    def grey(x):
+        o = (y * width + x) * 4
+        return (data[o] + data[o + 1] + data[o + 2]) / 3
+
+    # The title bar's own background, sampled where no name is drawn.
+    samples = sorted(grey(int(width * f)) for f in (0.5, 0.6, 0.7))
+    bar = samples[1]
+    if samples[2] - samples[0] > 4:
+        return TITLE_FRAME
+    edge = None
+    for x in range(max(1, left - TITLE_DIVIDER_SEARCH), min(left + TITLE_DIVIDER_SEARCH, width - 13)):
+        # First column of a flat stretch of title-bar colour right after a
+        # clearly different colour: the divider. List pixels are not the bar
+        # colour, so the search box or its icons can not end up in the crop.
+        if (abs(grey(x - 1) - bar) >= 12
+                and all(abs(grey(x + i) - bar) <= 4 for i in range(12))):
+            edge = x
+            break
+    if edge is None:
+        return TITLE_FRAME
+    return (edge, top, max(right, edge + 200), bottom)
 LEDGER = __import__("os").path.join(REPO, "data", "send-ledger.jsonl")
 # How many blocks above a changed newest block may be read to find the newest
 # block seen before it (merge window: 3 messages, plus our own reply).
@@ -117,7 +160,7 @@ def read_frame(frame, changed, *, calibration, ocr, window_rect, anchor):
 
     # Verify the conversation whenever we are about to interpret a change:
     # acting on the wrong chat is the one mistake that cannot be undone.
-    title_text = _ocr_text(ocr, frame.crop(TITLE_FRAME))
+    title_text = _ocr_text(ocr, frame.crop(title_box(frame)))
     if calibration["title"] not in title_text.replace(" ", ""):
         return Reading(geometry_ok=True, title_ok=False, title_seen=title_text)
     if scrolled:

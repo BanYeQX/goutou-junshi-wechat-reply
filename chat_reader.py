@@ -26,13 +26,13 @@ class ReadError(ValueError):
 
 def read_from_frame(frame, *, expected_title, calibration, ocr, window_rect, limit=20):
     """frame (wechat_capture.PixelImage) -> list[Turn]. Pure: no window access."""
-    from hosting_run import TITLE_FRAME, _ocr_text, collect_context, passes_geometry
+    from hosting_run import _ocr_text, collect_context, passes_geometry, title_box
     name = (expected_title or "").strip()
     if not name:
         raise ReadError("先在左侧选中联系人。")
     if not passes_geometry(window_rect, calibration["window_rect"]):
         raise ReadError("微信窗口不是标定时的最大化布局：请把微信最大化后再读取。")
-    seen = _ocr_text(ocr, frame.crop(TITLE_FRAME)).replace(" ", "")
+    seen = _ocr_text(ocr, frame.crop(title_box(frame))).replace(" ", "")
     if name.replace(" ", "") not in seen:
         raise ReadError(f"微信里打开的不是「{name}」的聊天（标题识别为：{seen or '空'}）。"
                         "请先在微信里点开和 TA 的聊天。")
